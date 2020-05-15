@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod gpx_parser;
+mod stats;
 
 pub use gpx_parser::read_gpx;
 
@@ -40,6 +41,17 @@ impl TrackPoint {
             cadence: 0
         }
     }
+
+    pub fn from_coordinates(latitude: f64, longitude: f64) -> TrackPoint {
+        TrackPoint {
+            latitude,
+            longitude,
+            elevation: 0.0,
+            time: Utc::now(),
+            heart_rate: 0,
+            cadence: 0
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -56,6 +68,10 @@ impl Track {
             start_time: None,
             route: Vec::new(),
         }
+    }
+
+    pub fn distance(&self) -> f64 {
+        stats::calc_track_distance(&self.route)
     }
 }
 
