@@ -39,7 +39,7 @@ impl TrackPoint {
             elevation: 0.0,
             time: Utc::now(),
             heart_rate: 0,
-            cadence: 0
+            cadence: 0,
         }
     }
 
@@ -50,7 +50,7 @@ impl TrackPoint {
             elevation: 0.0,
             time: Utc::now(),
             heart_rate: 0,
-            cadence: 0
+            cadence: 0,
         }
     }
 }

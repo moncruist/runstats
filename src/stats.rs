@@ -118,8 +118,18 @@ mod tests {
             TrackPoint::from_coordinates(1.8, 2.2),
         ];
 
-        let dist1 = distance(points[0].latitude, points[0].longitude, points[1].latitude, points[1].longitude);
-        let dist2 = distance(points[1].latitude, points[1].longitude, points[2].latitude, points[2].longitude);
+        let dist1 = distance(
+            points[0].latitude,
+            points[0].longitude,
+            points[1].latitude,
+            points[1].longitude,
+        );
+        let dist2 = distance(
+            points[1].latitude,
+            points[1].longitude,
+            points[2].latitude,
+            points[2].longitude,
+        );
         let total = dist1 + dist2;
 
         assert_eq!(calc_track_distance(&points), total);
@@ -138,7 +148,10 @@ mod tests {
             points[i].time = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(secs, 0), Utc);
         }
 
-        assert_eq!(calc_track_duration(&points).as_millis(), expected_duration_millis);
+        assert_eq!(
+            calc_track_duration(&points).as_millis(),
+            expected_duration_millis
+        );
     }
 
     #[test]
