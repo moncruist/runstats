@@ -19,6 +19,7 @@ mod stats;
 pub use gpx_parser::read_gpx;
 
 use chrono::{DateTime, Utc};
+use std::time::Duration;
 
 #[derive(Debug, Copy, Clone)]
 pub struct TrackPoint {
@@ -77,6 +78,10 @@ impl Track {
         } else {
             0
         }
+    }
+
+    pub fn duration(&self) -> Duration {
+        stats::calc_track_duration(&self.route)
     }
 }
 

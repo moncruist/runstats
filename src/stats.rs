@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::f64::consts::PI;
+use std::time::Duration;
 
 use super::TrackPoint;
 
@@ -66,9 +67,33 @@ pub fn calc_track_distance(points: &Vec<TrackPoint>) -> f64 {
     total_distance
 }
 
+pub fn calc_track_duration(points: &[TrackPoint]) -> Duration {
+    let mut total_duration = Duration::new(0, 0);
+
+    for point_idx in 0..points.len() {
+        let next_idx = point_idx + 1;
+        if next_idx == points.len() {
+            break;
+        }
+
+        let point = &points[point_idx];
+        let next_point = &points[next_idx];
+
+        let duration = next_point
+            .time
+            .signed_duration_since(point.time)
+            .to_std()
+            .unwrap();
+        total_duration += duration;
+    }
+
+    total_duration
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{DateTime, NaiveDateTime, Utc};
 
     #[test]
     fn test_zero_distance() {
@@ -98,5 +123,38 @@ mod tests {
         let total = dist1 + dist2;
 
         assert_eq!(calc_track_distance(&points), total);
+    }
+
+    #[test]
+    fn test_calc_track_duration_10_points() {
+        let mut points: [TrackPoint; 10] = [TrackPoint::new(); 10];
+
+        let step_sec: i64 = 3;
+        let offset_sec: i64 = 100;
+        let expected_duration_millis = step_sec as u128 * 1000 * (points.len() - 1) as u128;
+
+        for i in 0..points.len() {
+            let secs = offset_sec + step_sec * i as i64;
+            points[i].time = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(secs, 0), Utc);
+        }
+
+        assert_eq!(calc_track_duration(&points).as_millis(), expected_duration_millis);
+    }
+
+    #[test]
+    fn test_calc_track_duration_1_point() {
+        let mut points: [TrackPoint; 1] = [TrackPoint::new()];
+        points[0].time = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(123456, 0), Utc);
+
+        assert_eq!(calc_track_duration(&points).as_millis(), 0);
+    }
+
+    #[test]
+    fn test_calc_track_duration_2_same_point() {
+        let mut points: [TrackPoint; 2] = [TrackPoint::new(); 2];
+        points[0].time = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(123456, 0), Utc);
+        points[1].time = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(123456, 0), Utc);
+
+        assert_eq!(calc_track_duration(&points).as_millis(), 0);
     }
 }

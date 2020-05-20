@@ -33,7 +33,9 @@ fn main() {
     }
 
     if let Ok(track) = runstats::read_gpx(gpx_path) {
-        println!("Track distance {}", track.distance());
+        println!("Track info:");
+        println!("Distance (meters):\t{}", track.distance());
+        println!("Duration (seconds):\t{}", track.duration().as_secs());
     } else {
         eprintln!("Parsing error");
     }
