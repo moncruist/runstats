@@ -47,6 +47,7 @@ struct ParserContext {
     in_track_point: bool,
     current_tag: Option<GpxXmlTag>,
     current_track_point: TrackPoint,
+    should_sort_track: bool,
 }
 
 impl ParserContext {
@@ -59,6 +60,7 @@ impl ParserContext {
             in_track_point: false,
             current_tag: None,
             current_track_point: TrackPoint::new(),
+            should_sort_track: false,
         }
     }
 }
@@ -222,6 +224,15 @@ fn parse_xml_characters(
                 track.start_time = Some(start_time);
             } else if context.in_track_point {
                 context.current_track_point.time = start_time;
+
+                // Check whether current track point comes after the latest point.
+                // If not, it should sort track later
+                if (track.route.len() > 0) && (!context.should_sort_track) {
+                    let latest_point = &track.route[track.route.len() - 1];
+                    if latest_point.time.gt(&context.current_track_point.time) {
+                        context.should_sort_track = true;
+                    }
+                }
             }
         }
         GpxXmlTag::Name => {
@@ -298,6 +309,10 @@ fn read_gpx_from<R: Read>(reader: BufReader<R>) -> Result<Track, ParseError> {
             }
             _ => {}
         }
+    }
+
+    if context.should_sort_track {
+        track.route.sort_by(|a, b| a.time.cmp(&b.time));
     }
 
     Ok(track)
@@ -452,6 +467,73 @@ xmlns:gpxx=\"http://www.garmin.com/xmlschemas/GpxExtensions/v3\">
                     <gpxtpx:TrackPointExtension>
                         <gpxtpx:hr>98</gpxtpx:hr>
                         <gpxtpx:cad>80</gpxtpx:cad>
+                    </gpxtpx:TrackPointExtension>
+                </extensions>
+            </trkpt>
+        </trkseg>
+    </trk>
+</gpx>".as_bytes();
+        let reader = BufReader::new(gpx_str);
+
+        let result = read_gpx_from(reader);
+        assert!(result.is_ok());
+        let track = result.unwrap();
+        assert_eq!(track.name, "Test run");
+        assert_eq!(track.route.len(), 2);
+
+        let expected_time = Utc.ymd(2020, 4, 22).and_hms(16, 01, 58);
+        assert_eq!(track.start_time, Some(expected_time));
+
+        let point_0_time = Utc.ymd(2020, 4, 22).and_hms(16, 01, 58);
+        assert_eq!(track.route[0].latitude, 10.1025420);
+        assert_eq!(track.route[0].longitude, 15.1583540);
+        assert_eq!(track.route[0].elevation, 478.2);
+        assert_eq!(track.route[0].time, point_0_time);
+        assert_eq!(track.route[0].heart_rate, 95);
+        assert_eq!(track.route[0].cadence, 79);
+
+        let point_1_time = Utc.ymd(2020, 4, 22).and_hms(16, 02, 04);
+        assert_eq!(track.route[1].latitude, 10.1025432);
+        assert_eq!(track.route[1].longitude, 15.1583542);
+        assert_eq!(track.route[1].elevation, 480.3);
+        assert_eq!(track.route[1].time, point_1_time);
+        assert_eq!(track.route[1].heart_rate, 98);
+        assert_eq!(track.route[1].cadence, 80);
+    }
+
+    #[test]
+    fn test_parsing_gpx_with_invalid_point_order() {
+        let gpx_str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<gpx creator=\"StravaGPX\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" 
+xsi:schemaLocation=\"http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd http://www.garmin.com/xmlschemas/GpxExtensions/v3 http://www.garmin.com/xmlschemas/GpxExtensionsv3.xsd http://www.garmin.com/xmlschemas/TrackPointExtension/v1 http://www.garmin.com/xmlschemas/TrackPointExtensionv1.xsd\" 
+version=\"1.1\" 
+xmlns=\"http://www.topografix.com/GPX/1/1\" 
+xmlns:gpxtpx=\"http://www.garmin.com/xmlschemas/TrackPointExtension/v1\" 
+xmlns:gpxx=\"http://www.garmin.com/xmlschemas/GpxExtensions/v3\">
+    <metadata>
+        <time>2020-04-22T16:01:58Z</time>
+    </metadata>
+    <trk>
+        <name>Test run</name>
+        <type>9</type>
+        <trkseg>
+            <trkpt lat=\"10.1025432\" lon=\"15.1583542\">
+                <ele>480.3</ele>
+                <time>2020-04-22T16:02:04Z</time>
+                <extensions>
+                    <gpxtpx:TrackPointExtension>
+                        <gpxtpx:hr>98</gpxtpx:hr>
+                        <gpxtpx:cad>80</gpxtpx:cad>
+                    </gpxtpx:TrackPointExtension>
+                </extensions>
+            </trkpt>
+            <trkpt lat=\"10.1025420\" lon=\"15.1583540\">
+                <ele>478.2</ele>
+                <time>2020-04-22T16:01:58Z</time>
+                <extensions>
+                    <gpxtpx:TrackPointExtension>
+                        <gpxtpx:hr>95</gpxtpx:hr>
+                        <gpxtpx:cad>79</gpxtpx:cad>
                     </gpxtpx:TrackPointExtension>
                 </extensions>
             </trkpt>
