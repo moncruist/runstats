@@ -70,8 +70,13 @@ impl Track {
         }
     }
 
-    pub fn distance(&self) -> f64 {
-        stats::calc_track_distance(&self.route)
+    pub fn distance(&self) -> u64 {
+        let distance = stats::calc_track_distance(&self.route);
+        if distance > 0.0 {
+            distance as u64
+        } else {
+            0
+        }
     }
 }
 
