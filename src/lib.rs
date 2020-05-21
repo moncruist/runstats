@@ -56,10 +56,21 @@ impl TrackPoint {
 }
 
 #[derive(Debug)]
+pub struct TrackSegment {
+    points: Vec<TrackPoint>,
+}
+
+impl TrackSegment {
+    pub fn new() ->TrackSegment {
+        TrackSegment { points: Vec::new() }
+    }
+}
+
+#[derive(Debug)]
 pub struct Track {
     name: String,
     start_time: Option<DateTime<Utc>>,
-    route: Vec<TrackPoint>,
+    route: Vec<TrackSegment>,
 }
 
 impl Track {
@@ -72,7 +83,11 @@ impl Track {
     }
 
     pub fn distance(&self) -> u64 {
-        let distance = stats::calc_track_distance(&self.route);
+        let mut distance = 0.0;
+        for segment in &self.route {
+            distance += stats::calc_track_distance(&segment.points);
+        }
+
         if distance > 0.0 {
             distance as u64
         } else {
@@ -81,7 +96,13 @@ impl Track {
     }
 
     pub fn duration(&self) -> Duration {
-        stats::calc_track_duration(&self.route)
+        let mut total_duration = Duration::new(0, 0);
+
+        for segment in &self.route {
+            total_duration += stats::calc_track_duration(&segment.points);
+        }
+
+        total_duration
     }
 }
 

@@ -46,7 +46,7 @@ fn distance(lat1: f64, long1: f64, lat2: f64, long2: f64) -> f64 {
     angle * EARTH_RADIUS
 }
 
-pub fn calc_track_distance(points: &Vec<TrackPoint>) -> f64 {
+pub fn calc_track_distance(points: &[TrackPoint]) -> f64 {
     let mut total_distance = 0.0_f64;
 
     for point_idx in 0..points.len() {
