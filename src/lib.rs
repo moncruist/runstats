@@ -23,12 +23,12 @@ use std::time::Duration;
 
 #[derive(Debug, Copy, Clone)]
 pub struct TrackPoint {
-    latitude: f64,
-    longitude: f64,
-    elevation: f64,
-    time: DateTime<Utc>,
-    heart_rate: u8,
-    cadence: u8,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub elevation: f64,
+    pub time: DateTime<Utc>,
+    pub heart_rate: u8,
+    pub cadence: u8,
 }
 
 impl TrackPoint {
@@ -57,7 +57,7 @@ impl TrackPoint {
 
 #[derive(Debug)]
 pub struct TrackSegment {
-    points: Vec<TrackPoint>,
+    pub points: Vec<TrackPoint>,
 }
 
 impl TrackSegment {
@@ -68,9 +68,9 @@ impl TrackSegment {
 
 #[derive(Debug)]
 pub struct Track {
-    name: String,
-    start_time: Option<DateTime<Utc>>,
-    route: Vec<TrackSegment>,
+    pub name: String,
+    pub start_time: Option<DateTime<Utc>>,
+    pub route: Vec<TrackSegment>,
 }
 
 impl Track {
