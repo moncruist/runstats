@@ -93,6 +93,17 @@ impl Track {
     pub fn avg_heart_rate(&self) -> u8 {
         stats::calc_track_average_heart_rate(&self)
     }
+
+    pub fn splits(&self) -> Vec<Split> {
+        stats::calc_track_splits(self)
+    }
+}
+
+#[derive(Debug)]
+pub struct Split {
+    pub distance: u16,
+    pub pace: u64,
+    pub elevation_delta: i32,
 }
 
 #[derive(Debug)]

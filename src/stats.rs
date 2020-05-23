@@ -16,7 +16,7 @@
 use std::f64::consts::PI;
 use std::time::Duration;
 
-use super::{TrackPoint, Track};
+use super::{Split, TrackPoint, Track};
 
 /// In meters according to WGS84
 const EARTH_RADIUS: f64 = 6371008.8;
@@ -47,9 +47,9 @@ fn distance(lat1: f64, long1: f64, lat2: f64, long2: f64) -> f64 {
 }
 
 /// Calculates distance taking into account elevations of two points
-fn distance_with_elevation(dist: f64, elevation1: f64, elevation2: f64) -> f64 {
-    let cathet1 = dist;
-    let cathet2 = (elevation2 - elevation1).abs();
+fn distance_with_elevation(point1: &TrackPoint, point2: &TrackPoint) -> f64 {
+    let cathet1 = distance(point1.latitude, point1.longitude, point2.latitude, point2.longitude);
+    let cathet2 = (point2.elevation - point1.elevation).abs();
 
     let hypot = (cathet1 * cathet1 + cathet2 * cathet2).sqrt();
     hypot 
@@ -66,13 +66,7 @@ fn calc_track_distance_segment(points: &[TrackPoint]) -> f64 {
 
         let point = &points[point_idx];
         let next_point = &points[next_idx];
-        let horizontal_dist = distance(
-            point.latitude,
-            point.longitude,
-            next_point.latitude,
-            next_point.longitude,
-        );
-        total_distance += distance_with_elevation(horizontal_dist, point.elevation, next_point.elevation);
+        total_distance += distance_with_elevation(point, next_point);
     }
     total_distance
 }
@@ -180,6 +174,73 @@ pub fn calc_track_average_heart_rate(track: &Track) -> u8 {
     }
 }
 
+/// Calculates track splits. Return value is array of paces per km in seconds.
+pub fn calc_track_splits(track: &Track) -> Vec<Split> {
+    const METERS_IN_KM: f64 = 1000.0;
+    const MIN_SPLIT_THRESHOLD: f64 = 100.0;
+
+    let mut splits = Vec::new();
+
+    let mut dist_accumulator: f64 = 0.0;
+    let mut current_km_duration: u64 = 0;
+    let mut start_elevation: f64 = 0.0;
+    let mut latest_elevation: f64 = 0.0;
+
+    for segment in &track.route {
+        for i in 0..segment.points.len() - 1 {
+            let point = &segment.points[i];
+            let next = &segment.points[i + 1];
+
+            let dist = distance_with_elevation(point, next);
+            let duration = duration_between_points(point, next).as_secs();
+            
+            if dist_accumulator == 0.0 {
+                start_elevation = point.elevation;
+            }
+
+            latest_elevation = next.elevation;
+
+            let pending = dist_accumulator + dist;
+            if pending < METERS_IN_KM {
+                dist_accumulator = pending;
+                current_km_duration += duration;
+            } else if pending == METERS_IN_KM {
+                current_km_duration += duration;
+                let delta = next.elevation - start_elevation;
+                splits.push(Split { distance: METERS_IN_KM as u16, pace: current_km_duration, elevation_delta: delta as i32 });
+
+                current_km_duration = 0;
+                dist_accumulator = 0.0;
+                start_elevation = next.elevation;
+            } else {
+                let extra = (pending - METERS_IN_KM) / dist;
+                let extra_duration = (duration as f64 * extra) as u64;
+
+                current_km_duration += duration - extra_duration;
+                let current_delta = next.elevation - point.elevation;
+                let extra_elevation = current_delta * extra;
+                let current_end_elevation = point.elevation + extra_elevation;
+                let split_delta = current_end_elevation - start_elevation;
+
+                splits.push(Split { distance: METERS_IN_KM as u16, pace: current_km_duration, elevation_delta: split_delta as i32 });
+
+                current_km_duration = extra_duration;
+                dist_accumulator = extra * dist;
+                start_elevation = current_end_elevation;
+            }
+        }
+    }
+
+    if dist_accumulator >= MIN_SPLIT_THRESHOLD && current_km_duration > 0 {
+        let coeff = dist_accumulator / METERS_IN_KM;
+        let estimated_duration = (current_km_duration as f64 / coeff) as u64;
+        let split_delta = latest_elevation - start_elevation;
+        splits.push(Split { distance: dist_accumulator as u16, pace: estimated_duration, elevation_delta: split_delta as i32 });
+    }
+
+    splits
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,6 +249,17 @@ mod tests {
 
     fn new_date_time(seconds: i64) -> DateTime<Utc> {
         DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(seconds, 0), Utc)
+    }
+
+    fn new_point_from_coords(latitude: f64, longitude: f64, elevation: f64) -> TrackPoint {
+        TrackPoint {
+            latitude,
+            longitude,
+            elevation,
+            time: Utc::now(),
+            heart_rate: 0,
+            cadence: 0,
+        }
     }
 
     #[test]
@@ -357,5 +429,47 @@ mod tests {
 
         let avg_heart_rate = calc_track_average_heart_rate(&track);
         assert_eq!(avg_heart_rate, 115);
+    }
+
+    #[test]
+    fn test_calc_track_splits() {
+        const LONGITUDE_STEP: f64 = 2.0 * PI * EARTH_RADIUS / 360.0; // diff between two degrees of longitude in equator, meters
+        const LONGITUDE_STEP_1KM: f64 = 1000.0 / LONGITUDE_STEP;
+
+        let mut segment = TrackSegment::new();
+        segment.points.push(new_point_from_coords(0.0, 100.0, 100.0));
+        segment.points.push(new_point_from_coords(0.0, 100.0 + LONGITUDE_STEP_1KM, 100.0));
+        segment.points.push(new_point_from_coords(0.0, 100.0 + LONGITUDE_STEP_1KM * 1.5, 100.0));
+        segment.points.push(new_point_from_coords(0.0, 100.0 + LONGITUDE_STEP_1KM * 2.5, 100.0));
+        segment.points.push(new_point_from_coords(0.0, 100.0 + LONGITUDE_STEP_1KM * 3.5, 100.0));
+
+        segment.points[0].time = new_date_time(100);
+        segment.points[1].time = new_date_time(500);
+        segment.points[2].time = new_date_time(700);
+        segment.points[3].time = new_date_time(1050);
+        segment.points[4].time = new_date_time(1350);
+
+        let mut track = Track::new();
+        track.route.push(segment);
+
+        let splits = calc_track_splits(&track);
+
+        assert_eq!(splits.len(), 4);
+
+        assert!((splits[0].distance as i32 - 1000).abs() <= 2);
+        assert!((splits[0].pace as i32 - 400).abs() <= 2);
+        assert_eq!(splits[0].elevation_delta, 0);
+
+        assert!((splits[1].distance as i32 - 1000).abs() <= 2);
+        assert!((splits[1].pace as i32 - 375).abs() <= 2);
+        assert_eq!(splits[1].elevation_delta, 0);
+
+        assert!((splits[2].distance as i32 - 1000).abs() <= 2);
+        assert!((splits[2].pace as i32 - 325).abs() <= 2);
+        assert_eq!(splits[2].elevation_delta, 0);
+
+        assert!((splits[3].distance as i32 - 500).abs() <= 2);
+        assert!((splits[3].pace as i32 - 300).abs() <= 2);
+        assert_eq!(splits[3].elevation_delta, 0);
     }
 }

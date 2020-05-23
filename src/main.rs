@@ -37,6 +37,13 @@ fn main() {
         println!("Distance (meters):\t{}", track.distance());
         println!("Duration (seconds):\t{}", track.duration().as_secs());
         println!("Avg heart rate (bpm):\t{}", track.avg_heart_rate());
+        
+        println!("Splits:");
+        let splits = track.splits();
+        for i in 0..splits.len() {
+            let km = (i as u16 * 1000 + splits[i].distance) as f64 / 1000.0;
+            println!("{} km:\t{} secs/km\t{} meters", km, splits[i].pace, splits[i].elevation_delta);
+        }
     } else {
         eprintln!("Parsing error");
     }
