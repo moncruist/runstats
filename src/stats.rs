@@ -46,7 +46,7 @@ fn distance(lat1: f64, long1: f64, lat2: f64, long2: f64) -> f64 {
     angle * EARTH_RADIUS
 }
 
-pub fn calc_track_distance(points: &[TrackPoint]) -> f64 {
+fn calc_track_distance_segment(points: &[TrackPoint]) -> f64 {
     let mut total_distance = 0.0_f64;
 
     for point_idx in 0..points.len() {
@@ -67,11 +67,24 @@ pub fn calc_track_distance(points: &[TrackPoint]) -> f64 {
     total_distance
 }
 
+pub fn calc_track_distance(track: &Track) -> u64 {
+    let mut distance = 0.0;
+    for segment in &track.route {
+        distance += calc_track_distance_segment(&segment.points);
+    }
+
+    if distance > 0.0 {
+        distance as u64
+    } else {
+        0
+    }
+}
+
 fn duration_between_points(point1: &TrackPoint, point2: &TrackPoint) -> Duration {
     point2.time.signed_duration_since(point1.time).to_std().unwrap()
 }
 
-pub fn calc_track_duration(points: &[TrackPoint]) -> Duration {
+fn calc_track_duration_segment(points: &[TrackPoint]) -> Duration {
     if points.len() == 0 {
         return Duration::new(0, 0);
     }
@@ -89,6 +102,16 @@ pub fn calc_track_duration(points: &[TrackPoint]) -> Duration {
 
         let duration = duration_between_points(point, next_point);
         total_duration += duration;
+    }
+
+    total_duration
+}
+
+pub fn calc_track_duration(track: &Track) -> Duration {
+    let mut total_duration = Duration::new(0, 0);
+
+    for segment in &track.route {
+        total_duration += calc_track_duration_segment(&segment.points);
     }
 
     total_duration
@@ -192,45 +215,77 @@ mod tests {
             points[2].latitude,
             points[2].longitude,
         );
-        let total = dist1 + dist2;
+        let total = (dist1 + dist2) as u64;
 
-        assert_eq!(calc_track_distance(&points), total);
+        let mut segment = TrackSegment::new();
+        segment.points = points;
+
+        let mut track = Track::new();
+        track.route.push(segment);
+
+        assert_eq!(calc_track_distance(&track), total);
     }
 
     #[test]
     fn test_calc_track_duration_10_points() {
-        let mut points: [TrackPoint; 10] = [TrackPoint::new(); 10];
+        const POINTS_NUM: usize = 10;
+        let mut points = Vec::with_capacity(POINTS_NUM);
 
         let step_sec: i64 = 3;
         let offset_sec: i64 = 100;
-        let expected_duration_millis = step_sec as u128 * 1000 * (points.len() - 1) as u128;
+        let expected_duration_millis = step_sec as u128 * 1000 * (POINTS_NUM - 1) as u128;
 
-        for i in 0..points.len() {
+        for i in 0..POINTS_NUM {
             let secs = offset_sec + step_sec * i as i64;
-            points[i].time = new_date_time(secs);
+            let mut point = TrackPoint::new();
+            point.time = new_date_time(secs);
+            points.push(point);
         }
 
+        let mut segment = TrackSegment::new();
+        segment.points = points;
+
+        let mut track = Track::new();
+        track.route.push(segment);
+
         assert_eq!(
-            calc_track_duration(&points).as_millis(),
+            calc_track_duration(&track).as_millis(),
             expected_duration_millis
         );
     }
 
     #[test]
     fn test_calc_track_duration_1_point() {
-        let mut points: [TrackPoint; 1] = [TrackPoint::new()];
-        points[0].time = new_date_time(123456);
+        let mut point = TrackPoint::new();
+        point.time = new_date_time(123456);
 
-        assert_eq!(calc_track_duration(&points).as_millis(), 0);
+        let mut segment = TrackSegment::new();
+        segment.points.push(point);
+
+        let mut track = Track::new();
+        track.route.push(segment);
+
+        assert_eq!(calc_track_duration(&track).as_millis(), 0);
     }
 
     #[test]
     fn test_calc_track_duration_2_same_point() {
-        let mut points: [TrackPoint; 2] = [TrackPoint::new(); 2];
-        points[0].time = new_date_time(123456);
-        points[1].time = new_date_time(123456);
+        let mut points = Vec::with_capacity(2);[TrackPoint::new(); 2];
+        let mut point = TrackPoint::new();
+        point.time = new_date_time(123456);
+        points.push(point);
 
-        assert_eq!(calc_track_duration(&points).as_millis(), 0);
+        let mut point = TrackPoint::new();
+        point.time = new_date_time(123456);
+        points.push(point);
+
+        let mut segment = TrackSegment::new();
+        segment.points = points;
+
+        let mut track = Track::new();
+        track.route.push(segment);
+
+        assert_eq!(calc_track_duration(&track).as_millis(), 0);
     }
 
     fn new_track_point_hr(seconds: i64, heart_rate: u8) -> TrackPoint {

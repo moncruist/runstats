@@ -83,26 +83,11 @@ impl Track {
     }
 
     pub fn distance(&self) -> u64 {
-        let mut distance = 0.0;
-        for segment in &self.route {
-            distance += stats::calc_track_distance(&segment.points);
-        }
-
-        if distance > 0.0 {
-            distance as u64
-        } else {
-            0
-        }
+        stats::calc_track_distance(self)
     }
 
     pub fn duration(&self) -> Duration {
-        let mut total_duration = Duration::new(0, 0);
-
-        for segment in &self.route {
-            total_duration += stats::calc_track_duration(&segment.points);
-        }
-
-        total_duration
+        stats::calc_track_duration(self)
     }
 
     pub fn avg_heart_rate(&self) -> u8 {
