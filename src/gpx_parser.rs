@@ -224,7 +224,7 @@ fn parse_xml_characters(
             let start_time = DateTime::<Utc>::from(start_time.unwrap());
 
             if context.in_metadata {
-                track.start_time = Some(start_time);
+                track.creation_time = Some(start_time);
             } else if context.in_track_point {
                 context.current_track_point.time = start_time;
 
@@ -420,7 +420,7 @@ xmlns:gpxx=\"http://www.garmin.com/xmlschemas/GpxExtensions/v3\">
         assert!(result.is_ok());
         let track = result.unwrap();
         assert_eq!(track.name, "");
-        assert_eq!(track.start_time, None);
+        assert_eq!(track.creation_time, None);
         assert_eq!(track.route.len(), 0);
     }
 
@@ -447,7 +447,7 @@ xmlns:gpxx=\"http://www.garmin.com/xmlschemas/GpxExtensions/v3\">
         assert_eq!(track.route.len(), 0);
 
         let expected_time = Utc.ymd(2020, 4, 22).and_hms(16, 01, 58);
-        assert_eq!(track.start_time, Some(expected_time));
+        assert_eq!(track.creation_time, Some(expected_time));
     }
 
     #[test]
@@ -499,7 +499,7 @@ xmlns:gpxx=\"http://www.garmin.com/xmlschemas/GpxExtensions/v3\">
         assert_eq!(track.route[0].points.len(), 2);
 
         let expected_time = Utc.ymd(2020, 4, 22).and_hms(16, 01, 58);
-        assert_eq!(track.start_time, Some(expected_time));
+        assert_eq!(track.creation_time, Some(expected_time));
 
         let point_0_time = Utc.ymd(2020, 4, 22).and_hms(16, 01, 58);
         assert_eq!(track.route[0].points[0].latitude, 10.1025420);
@@ -567,7 +567,7 @@ xmlns:gpxx=\"http://www.garmin.com/xmlschemas/GpxExtensions/v3\">
         assert_eq!(track.route[0].points.len(), 2);
 
         let expected_time = Utc.ymd(2020, 4, 22).and_hms(16, 01, 58);
-        assert_eq!(track.start_time, Some(expected_time));
+        assert_eq!(track.creation_time, Some(expected_time));
 
         let point_0_time = Utc.ymd(2020, 4, 22).and_hms(16, 01, 58);
         assert_eq!(track.route[0].points[0].latitude, 10.1025420);
@@ -659,7 +659,7 @@ xmlns:gpxx=\"http://www.garmin.com/xmlschemas/GpxExtensions/v3\">
         assert_eq!(track.route[1].points.len(), 2);
 
         let expected_time = Utc.ymd(2020, 4, 22).and_hms(16, 01, 58);
-        assert_eq!(track.start_time, Some(expected_time));
+        assert_eq!(track.creation_time, Some(expected_time));
 
         let point_0_time = Utc.ymd(2020, 4, 22).and_hms(16, 01, 58);
         assert_eq!(track.route[0].points[0].latitude, 10.1025420);

@@ -69,7 +69,7 @@ impl TrackSegment {
 #[derive(Debug)]
 pub struct Track {
     pub name: String,
-    pub start_time: Option<DateTime<Utc>>,
+    pub creation_time: Option<DateTime<Utc>>,
     pub route: Vec<TrackSegment>,
 }
 
@@ -77,7 +77,7 @@ impl Track {
     pub fn new() -> Track {
         Track {
             name: String::new(),
-            start_time: None,
+            creation_time: None,
             route: Vec::new(),
         }
     }
