@@ -46,6 +46,15 @@ fn distance(lat1: f64, long1: f64, lat2: f64, long2: f64) -> f64 {
     angle * EARTH_RADIUS
 }
 
+/// Calculates distance taking into account elevations of two points
+fn distance_with_elevation(dist: f64, elevation1: f64, elevation2: f64) -> f64 {
+    let cathet1 = dist;
+    let cathet2 = (elevation2 - elevation1).abs();
+
+    let hypot = (cathet1 * cathet1 + cathet2 * cathet2).sqrt();
+    hypot 
+}
+
 fn calc_track_distance_segment(points: &[TrackPoint]) -> f64 {
     let mut total_distance = 0.0_f64;
 
@@ -57,12 +66,13 @@ fn calc_track_distance_segment(points: &[TrackPoint]) -> f64 {
 
         let point = &points[point_idx];
         let next_point = &points[next_idx];
-        total_distance += distance(
+        let horizontal_dist = distance(
             point.latitude,
             point.longitude,
             next_point.latitude,
             next_point.longitude,
         );
+        total_distance += distance_with_elevation(horizontal_dist, point.elevation, next_point.elevation);
     }
     total_distance
 }
@@ -224,6 +234,27 @@ mod tests {
         track.route.push(segment);
 
         assert_eq!(calc_track_distance(&track), total);
+    }
+
+    #[test]
+    fn test_calc_track_distance_with_elevation() {
+        let point1 = TrackPoint::from_coordinates(1.0, 1.0);
+        let mut point2 = TrackPoint::from_coordinates(2.0, 1.0);
+
+        // Make elevation of second point be equal to horizontal distance.
+        // Thus, real distance should be `sqrt(2.0) * distance`
+        let dist = distance(point1.latitude, point1.longitude, point2.latitude, point2.longitude);
+        point2.elevation = dist;
+
+        let mut segment = TrackSegment::new();
+        segment.points.push(point1);
+        segment.points.push(point2);
+
+        let mut track = Track::new();
+        track.route.push(segment);
+
+        let expected_dist = (2.0_f64.sqrt() * dist) as u64;
+        assert_eq!(calc_track_distance(&track), expected_dist);
     }
 
     #[test]
