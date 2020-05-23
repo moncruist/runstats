@@ -16,7 +16,7 @@
 use std::f64::consts::PI;
 use std::time::Duration;
 
-use super::{Split, TrackPoint, Track};
+use super::{Split, Track, TrackPoint};
 
 /// In meters according to WGS84
 const EARTH_RADIUS: f64 = 6371008.8;
@@ -48,11 +48,16 @@ fn distance(lat1: f64, long1: f64, lat2: f64, long2: f64) -> f64 {
 
 /// Calculates distance taking into account elevations of two points
 fn distance_with_elevation(point1: &TrackPoint, point2: &TrackPoint) -> f64 {
-    let cathet1 = distance(point1.latitude, point1.longitude, point2.latitude, point2.longitude);
+    let cathet1 = distance(
+        point1.latitude,
+        point1.longitude,
+        point2.latitude,
+        point2.longitude,
+    );
     let cathet2 = (point2.elevation - point1.elevation).abs();
 
     let hypot = (cathet1 * cathet1 + cathet2 * cathet2).sqrt();
-    hypot 
+    hypot
 }
 
 fn calc_track_distance_segment(points: &[TrackPoint]) -> f64 {
@@ -85,7 +90,11 @@ pub fn calc_track_distance(track: &Track) -> u64 {
 }
 
 fn duration_between_points(point1: &TrackPoint, point2: &TrackPoint) -> Duration {
-    point2.time.signed_duration_since(point1.time).to_std().unwrap()
+    point2
+        .time
+        .signed_duration_since(point1.time)
+        .to_std()
+        .unwrap()
 }
 
 fn calc_track_duration_segment(points: &[TrackPoint]) -> Duration {
@@ -143,7 +152,7 @@ pub fn calc_track_average_heart_rate(track: &Track) -> u8 {
                 }
 
                 break;
-            } 
+            }
 
             single_point_segment = false;
             let next_point = &segment.points[i + 1];
@@ -161,7 +170,6 @@ pub fn calc_track_average_heart_rate(track: &Track) -> u8 {
             }
 
             let s = (point.heart_rate as u64 + next_point.heart_rate as u64) * duration_sec / 2;
-            
             sum += s;
             total_duration_sec += duration_sec;
         }
@@ -193,7 +201,6 @@ pub fn calc_track_splits(track: &Track) -> Vec<Split> {
 
             let dist = distance_with_elevation(point, next);
             let duration = duration_between_points(point, next).as_secs();
-            
             if dist_accumulator == 0.0 {
                 start_elevation = point.elevation;
             }
@@ -207,7 +214,11 @@ pub fn calc_track_splits(track: &Track) -> Vec<Split> {
             } else if pending == METERS_IN_KM {
                 current_km_duration += duration;
                 let delta = next.elevation - start_elevation;
-                splits.push(Split { distance: METERS_IN_KM as u16, pace: current_km_duration, elevation_delta: delta as i32 });
+                splits.push(Split {
+                    distance: METERS_IN_KM as u16,
+                    pace: current_km_duration,
+                    elevation_delta: delta as i32,
+                });
 
                 current_km_duration = 0;
                 dist_accumulator = 0.0;
@@ -222,7 +233,11 @@ pub fn calc_track_splits(track: &Track) -> Vec<Split> {
                 let current_end_elevation = point.elevation + extra_elevation;
                 let split_delta = current_end_elevation - start_elevation;
 
-                splits.push(Split { distance: METERS_IN_KM as u16, pace: current_km_duration, elevation_delta: split_delta as i32 });
+                splits.push(Split {
+                    distance: METERS_IN_KM as u16,
+                    pace: current_km_duration,
+                    elevation_delta: split_delta as i32,
+                });
 
                 current_km_duration = extra_duration;
                 dist_accumulator = extra * dist;
@@ -235,7 +250,11 @@ pub fn calc_track_splits(track: &Track) -> Vec<Split> {
         let coeff = dist_accumulator / METERS_IN_KM;
         let estimated_duration = (current_km_duration as f64 / coeff) as u64;
         let split_delta = latest_elevation - start_elevation;
-        splits.push(Split { distance: dist_accumulator as u16, pace: estimated_duration, elevation_delta: split_delta as i32 });
+        splits.push(Split {
+            distance: dist_accumulator as u16,
+            pace: estimated_duration,
+            elevation_delta: split_delta as i32,
+        });
     }
 
     splits
@@ -243,9 +262,9 @@ pub fn calc_track_splits(track: &Track) -> Vec<Split> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::TrackSegment;
     use super::*;
     use chrono::{DateTime, NaiveDateTime, Utc};
-    use super::super::TrackSegment;
 
     fn new_date_time(seconds: i64) -> DateTime<Utc> {
         DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(seconds, 0), Utc)
@@ -315,7 +334,12 @@ mod tests {
 
         // Make elevation of second point be equal to horizontal distance.
         // Thus, real distance should be `sqrt(2.0) * distance`
-        let dist = distance(point1.latitude, point1.longitude, point2.latitude, point2.longitude);
+        let dist = distance(
+            point1.latitude,
+            point1.longitude,
+            point2.latitude,
+            point2.longitude,
+        );
         point2.elevation = dist;
 
         let mut segment = TrackSegment::new();
@@ -373,7 +397,8 @@ mod tests {
 
     #[test]
     fn test_calc_track_duration_2_same_point() {
-        let mut points = Vec::with_capacity(2);[TrackPoint::new(); 2];
+        let mut points = Vec::with_capacity(2);
+        [TrackPoint::new(); 2];
         let mut point = TrackPoint::new();
         point.time = new_date_time(123456);
         points.push(point);
@@ -437,11 +462,29 @@ mod tests {
         const LONGITUDE_STEP_1KM: f64 = 1000.0 / LONGITUDE_STEP;
 
         let mut segment = TrackSegment::new();
-        segment.points.push(new_point_from_coords(0.0, 100.0, 100.0));
-        segment.points.push(new_point_from_coords(0.0, 100.0 + LONGITUDE_STEP_1KM, 100.0));
-        segment.points.push(new_point_from_coords(0.0, 100.0 + LONGITUDE_STEP_1KM * 1.5, 100.0));
-        segment.points.push(new_point_from_coords(0.0, 100.0 + LONGITUDE_STEP_1KM * 2.5, 100.0));
-        segment.points.push(new_point_from_coords(0.0, 100.0 + LONGITUDE_STEP_1KM * 3.5, 100.0));
+        segment
+            .points
+            .push(new_point_from_coords(0.0, 100.0, 100.0));
+        segment.points.push(new_point_from_coords(
+            0.0,
+            100.0 + LONGITUDE_STEP_1KM,
+            100.0,
+        ));
+        segment.points.push(new_point_from_coords(
+            0.0,
+            100.0 + LONGITUDE_STEP_1KM * 1.5,
+            100.0,
+        ));
+        segment.points.push(new_point_from_coords(
+            0.0,
+            100.0 + LONGITUDE_STEP_1KM * 2.5,
+            100.0,
+        ));
+        segment.points.push(new_point_from_coords(
+            0.0,
+            100.0 + LONGITUDE_STEP_1KM * 3.5,
+            100.0,
+        ));
 
         segment.points[0].time = new_date_time(100);
         segment.points[1].time = new_date_time(500);
