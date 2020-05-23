@@ -16,7 +16,7 @@
 use std::f64::consts::PI;
 use std::time::Duration;
 
-use super::TrackPoint;
+use super::{TrackPoint, Track};
 
 /// In meters according to WGS84
 const EARTH_RADIUS: f64 = 6371008.8;
@@ -51,7 +51,7 @@ pub fn calc_track_distance(points: &[TrackPoint]) -> f64 {
 
     for point_idx in 0..points.len() {
         let next_idx = point_idx + 1;
-        if next_idx == points.len() {
+        if next_idx >= points.len() {
             break;
         }
 
@@ -67,33 +67,95 @@ pub fn calc_track_distance(points: &[TrackPoint]) -> f64 {
     total_distance
 }
 
+fn duration_between_points(point1: &TrackPoint, point2: &TrackPoint) -> Duration {
+    point2.time.signed_duration_since(point1.time).to_std().unwrap()
+}
+
 pub fn calc_track_duration(points: &[TrackPoint]) -> Duration {
+    if points.len() == 0 {
+        return Duration::new(0, 0);
+    }
+
     let mut total_duration = Duration::new(0, 0);
 
     for point_idx in 0..points.len() {
         let next_idx = point_idx + 1;
-        if next_idx == points.len() {
+        if next_idx >= points.len() {
             break;
         }
 
         let point = &points[point_idx];
         let next_point = &points[next_idx];
 
-        let duration = next_point
-            .time
-            .signed_duration_since(point.time)
-            .to_std()
-            .unwrap();
+        let duration = duration_between_points(point, next_point);
         total_duration += duration;
     }
 
     total_duration
 }
 
+pub fn calc_track_average_heart_rate(track: &Track) -> u8 {
+    let mut total_duration_sec: u64 = 0;
+    let mut sum: u64 = 0;
+
+    for segment in &track.route {
+        let mut single_point_segment = true;
+
+        for i in 0..segment.points.len() {
+            let point = &segment.points[i];
+            if point.heart_rate == 0 {
+                continue; // Skip invalid data
+            }
+
+            let next_idx = i + 1;
+            if next_idx >= segment.points.len() {
+                if single_point_segment {
+                    // Count as one value for 1 seconds
+                    sum += point.heart_rate as u64;
+                    total_duration_sec += 1;
+                }
+
+                break;
+            } 
+
+            single_point_segment = false;
+            let next_point = &segment.points[i + 1];
+
+            if next_point.heart_rate == 0 {
+                // Current point has HR, next one doesn't. Count as single HR value for 1 second
+                sum += point.heart_rate as u64;
+                total_duration_sec += 1;
+            }
+
+            // Both points has HR values. Use linear approximation for the values in between.
+            let duration_sec = duration_between_points(point, next_point).as_secs();
+            if duration_sec == 0 {
+                continue;
+            }
+
+            let s = (point.heart_rate as u64 + next_point.heart_rate as u64) * duration_sec / 2;
+            
+            sum += s;
+            total_duration_sec += duration_sec;
+        }
+    }
+
+    if total_duration_sec != 0 {
+        (sum / total_duration_sec) as u8
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::{DateTime, NaiveDateTime, Utc};
+    use super::super::TrackSegment;
+
+    fn new_date_time(seconds: i64) -> DateTime<Utc> {
+        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(seconds, 0), Utc)
+    }
 
     #[test]
     fn test_zero_distance() {
@@ -145,7 +207,7 @@ mod tests {
 
         for i in 0..points.len() {
             let secs = offset_sec + step_sec * i as i64;
-            points[i].time = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(secs, 0), Utc);
+            points[i].time = new_date_time(secs);
         }
 
         assert_eq!(
@@ -157,7 +219,7 @@ mod tests {
     #[test]
     fn test_calc_track_duration_1_point() {
         let mut points: [TrackPoint; 1] = [TrackPoint::new()];
-        points[0].time = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(123456, 0), Utc);
+        points[0].time = new_date_time(123456);
 
         assert_eq!(calc_track_duration(&points).as_millis(), 0);
     }
@@ -165,9 +227,49 @@ mod tests {
     #[test]
     fn test_calc_track_duration_2_same_point() {
         let mut points: [TrackPoint; 2] = [TrackPoint::new(); 2];
-        points[0].time = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(123456, 0), Utc);
-        points[1].time = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(123456, 0), Utc);
+        points[0].time = new_date_time(123456);
+        points[1].time = new_date_time(123456);
 
         assert_eq!(calc_track_duration(&points).as_millis(), 0);
+    }
+
+    fn new_track_point_hr(seconds: i64, heart_rate: u8) -> TrackPoint {
+        let mut point = TrackPoint::new();
+        point.time = new_date_time(seconds);
+        point.heart_rate = heart_rate;
+        point
+    }
+
+    #[test]
+    fn test_calc_track_average_heartrate() {
+        let mut track = Track::new();
+
+        let mut segment = TrackSegment::new();
+        segment.points.push(new_track_point_hr(100, 100));
+        segment.points.push(new_track_point_hr(110, 110));
+
+        track.route.push(segment);
+
+        let avg_heart_rate = calc_track_average_heart_rate(&track);
+        assert_eq!(avg_heart_rate, 105);
+    }
+
+    #[test]
+    fn test_calc_track_average_heartrate_multi_segment() {
+        let mut track = Track::new();
+
+        let mut segment = TrackSegment::new();
+        segment.points.push(new_track_point_hr(100, 100));
+        segment.points.push(new_track_point_hr(110, 110));
+
+        track.route.push(segment);
+
+        let mut segment = TrackSegment::new();
+        segment.points.push(new_track_point_hr(120, 120));
+        segment.points.push(new_track_point_hr(130, 130));
+        track.route.push(segment);
+
+        let avg_heart_rate = calc_track_average_heart_rate(&track);
+        assert_eq!(avg_heart_rate, 115);
     }
 }

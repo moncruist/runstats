@@ -36,6 +36,7 @@ fn main() {
         println!("Track info:");
         println!("Distance (meters):\t{}", track.distance());
         println!("Duration (seconds):\t{}", track.duration().as_secs());
+        println!("Avg heart rate (bpm):\t{}", track.avg_heart_rate());
     } else {
         eprintln!("Parsing error");
     }

@@ -104,6 +104,10 @@ impl Track {
 
         total_duration
     }
+
+    pub fn avg_heart_rate(&self) -> u8 {
+        stats::calc_track_average_heart_rate(&self)
+    }
 }
 
 #[derive(Debug)]
