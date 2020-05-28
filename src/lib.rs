@@ -110,3 +110,10 @@ pub struct Split {
 pub enum ParseError {
     XmlError,
 }
+
+#[derive(Debug)]
+pub struct ElevationStats {
+    pub max_elevation: i16,
+    pub min_elevation: i16,
+    pub gain: u16,
+}

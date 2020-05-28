@@ -16,7 +16,7 @@
 use std::f64::consts::PI;
 use std::time::Duration;
 
-use super::{Split, Track, TrackPoint};
+use super::{Split, Track, TrackPoint, ElevationStats};
 
 /// In meters according to WGS84
 const EARTH_RADIUS: f64 = 6371008.8;
@@ -258,6 +258,18 @@ pub fn calc_track_splits(track: &Track) -> Vec<Split> {
     }
 
     splits
+}
+
+pub fn calc_track_elevation_stats(track: &Track) -> ElevationStats {
+    let mut max_elevation: Option<f64> = None;
+    let mut min_elevation: Option<f64> = None;
+    let mut gain: f64 = 0.0;
+
+    for segment in &track.route {
+
+    }
+
+    ElevationStats {}
 }
 
 #[cfg(test)]
