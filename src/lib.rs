@@ -97,13 +97,17 @@ impl Track {
     pub fn splits(&self) -> Vec<Split> {
         stats::calc_track_splits(self)
     }
+
+    pub fn elevation_stats(&self) -> ElevationStats {
+        stats::calc_track_elevation_stats(self)
+    }
 }
 
 #[derive(Debug)]
 pub struct Split {
     pub distance: u16,
     pub pace: u64,
-    pub elevation_delta: i32,
+    pub elevation_delta: i16,
 }
 
 #[derive(Debug)]

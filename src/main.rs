@@ -44,6 +44,11 @@ fn main() {
             let km = (i as u16 * 1000 + splits[i].distance) as f64 / 1000.0;
             println!("{} km:\t{} secs/km\t{} meters", km, splits[i].pace, splits[i].elevation_delta);
         }
+        println!("Elevation:");
+        let elevation_stats = track.elevation_stats();
+        println!("Max elevation: {}", elevation_stats.max_elevation);
+        println!("Min elevation: {}", elevation_stats.min_elevation);
+        println!("Elevation gain: {}", elevation_stats.gain);
     } else {
         eprintln!("Parsing error");
     }

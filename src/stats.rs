@@ -217,7 +217,7 @@ pub fn calc_track_splits(track: &Track) -> Vec<Split> {
                 splits.push(Split {
                     distance: METERS_IN_KM as u16,
                     pace: current_km_duration,
-                    elevation_delta: delta as i32,
+                    elevation_delta: delta.round() as i16,
                 });
 
                 current_km_duration = 0;
@@ -236,7 +236,7 @@ pub fn calc_track_splits(track: &Track) -> Vec<Split> {
                 splits.push(Split {
                     distance: METERS_IN_KM as u16,
                     pace: current_km_duration,
-                    elevation_delta: split_delta as i32,
+                    elevation_delta: split_delta.round() as i16,
                 });
 
                 current_km_duration = extra_duration;
@@ -253,23 +253,66 @@ pub fn calc_track_splits(track: &Track) -> Vec<Split> {
         splits.push(Split {
             distance: dist_accumulator as u16,
             pace: estimated_duration,
-            elevation_delta: split_delta as i32,
+            elevation_delta: split_delta.round() as i16,
         });
     }
 
     splits
 }
 
+fn max_f64(a: f64, b: f64) -> f64 {
+    if a > b {
+        a
+    } else {
+        b
+    }
+}
+
+fn min_f64(a: f64, b: f64) -> f64 {
+    if a < b {
+        a
+    } else {
+        b
+    }
+}
+
 pub fn calc_track_elevation_stats(track: &Track) -> ElevationStats {
     let mut max_elevation: Option<f64> = None;
     let mut min_elevation: Option<f64> = None;
     let mut gain: f64 = 0.0;
+    let mut prev_elevation: Option<f64> = None;
 
     for segment in &track.route {
+        for point in &segment.points {
+            if point.elevation == 0.0 {
+                continue;
+            }
 
+            max_elevation = match max_elevation {
+                Some(elev) => Some(max_f64(elev, point.elevation)),
+                None => Some(point.elevation)
+            };
+
+            min_elevation = match min_elevation {
+                Some(elev) => Some(min_f64(elev, point.elevation)),
+                None => Some(point.elevation)
+            };
+
+            if let Some(elev) = prev_elevation {
+                if point.elevation > elev {
+                    gain += point.elevation - elev;
+                }
+            }
+
+            prev_elevation = Some(point.elevation);
+        }
     }
 
-    ElevationStats {}
+    let max_elevation = max_elevation.unwrap_or(0.0).round() as i16;
+    let min_elevation = min_elevation.unwrap_or(0.0).round() as i16;
+    let gain = gain.round() as u16;
+
+    ElevationStats {max_elevation, min_elevation, gain}
 }
 
 #[cfg(test)]
@@ -286,6 +329,17 @@ mod tests {
         TrackPoint {
             latitude,
             longitude,
+            elevation,
+            time: Utc::now(),
+            heart_rate: 0,
+            cadence: 0,
+        }
+    }
+
+    fn new_point_from_elevation(elevation: f64) -> TrackPoint {
+        TrackPoint {
+            latitude: 0.0,
+            longitude: 0.0,
             elevation,
             time: Utc::now(),
             heart_rate: 0,
@@ -526,5 +580,29 @@ mod tests {
         assert!((splits[3].distance as i32 - 500).abs() <= 2);
         assert!((splits[3].pace as i32 - 300).abs() <= 2);
         assert_eq!(splits[3].elevation_delta, 0);
+    }
+
+    #[test]
+    fn test_calc_track_elevation_stats() {
+        let mut track = Track::new();
+
+        let mut segment = TrackSegment::new();
+        segment.points.push(new_point_from_elevation(10.0));
+        segment.points.push(new_point_from_elevation(12.0));
+        segment.points.push(new_point_from_elevation(15.0));
+        segment.points.push(new_point_from_elevation(14.0));
+        segment.points.push(new_point_from_elevation(-3.0));
+        track.route.push(segment);
+
+        let mut segment = TrackSegment::new();
+        segment.points.push(new_point_from_elevation(-2.0));
+        segment.points.push(new_point_from_elevation(7.0));
+        segment.points.push(new_point_from_elevation(17.0));
+        track.route.push(segment);
+
+        let elevation_stats = calc_track_elevation_stats(&track);
+        assert_eq!(elevation_stats.max_elevation, 17);
+        assert_eq!(elevation_stats.min_elevation, -3);
+        assert_eq!(elevation_stats.gain, 25);
     }
 }
