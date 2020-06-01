@@ -14,9 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod gpx_parser;
+mod formatter;
 mod stats;
 
 pub use gpx_parser::read_gpx;
+pub use formatter::format_time;
+pub use formatter::format_duration;
 
 use chrono::{DateTime, Utc};
 use std::time::Duration;

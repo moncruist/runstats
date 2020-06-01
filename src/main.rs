@@ -35,14 +35,14 @@ fn main() {
     if let Ok(track) = runstats::read_gpx(gpx_path) {
         println!("Track info:");
         println!("Distance (meters):\t{}", track.distance());
-        println!("Duration (seconds):\t{}", track.duration().as_secs());
+        println!("Duration:\t{}", runstats::format_duration(track.duration()));
         println!("Avg heart rate (bpm):\t{}", track.avg_heart_rate());
         
         println!("Splits:");
         let splits = track.splits();
         for i in 0..splits.len() {
             let km = (i as u16 * 1000 + splits[i].distance) as f64 / 1000.0;
-            println!("{} km:\t{} secs/km\t{} meters", km, splits[i].pace, splits[i].elevation_delta);
+            println!("{} km:\t{} per km\t{} meters", km, runstats::format_time(splits[i].pace), splits[i].elevation_delta);
         }
         println!("Elevation:");
         let elevation_stats = track.elevation_stats();
